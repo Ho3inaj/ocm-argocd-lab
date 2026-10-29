@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # ============ EDIT ME (one time) ============
-export GIT_REPO_URL="https://github.com/YOUR_GITHUB_USERNAME/ocm-argocd-lab.git"
+export GIT_REPO_URL="https://github.com/Ho3inaj/ocm-argocd-lab.git"
 export GIT_REPO_BRANCH="main"
 # ============================================
 
