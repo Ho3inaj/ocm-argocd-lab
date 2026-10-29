@@ -16,12 +16,36 @@ if [ ! -f "$JOIN_FILE" ]; then
   exit 1
 fi
 
-HUB_URL="$(grep -m1 -oE -- '--hub=[^ ]+' "$JOIN_FILE" | cut -d= -f2- || true)"
-TOKEN="$(grep -m1 -oE -- '--token=[^ ]+' "$JOIN_FILE" | cut -d= -f2- || true)"
-
-if [ -z "$HUB_URL" ] || [ -z "$TOKEN" ]; then
-  echo "ERROR: could not parse --hub/--token from $JOIN_FILE. Contents:" >&2
+JOIN_LINE="$(grep -m1 'clusteradm join' "$JOIN_FILE" || true)"
+if [ -z "$JOIN_LINE" ]; then
+  echo "ERROR: no 'clusteradm join' line found in $JOIN_FILE. Contents:" >&2
   cat "$JOIN_FILE" >&2
+  exit 1
+fi
+
+HUB_URL="$(printf '%s\n' "$JOIN_LINE" | grep -oE -- '--hub-apiserver +[^ ]+' | awk '{print $2}' || true)"
+TOKEN="$(printf '%s\n' "$JOIN_LINE" | grep -oE -- '--hub-token +[^ ]+' | awk '{print $2}' || true)"
+HUB_STYLE=""
+if [ -n "$HUB_URL" ] && [ -n "$TOKEN" ]; then
+  HUB_STYLE="--hub-apiserver ${HUB_URL} --hub-token ${TOKEN}"
+else
+  HUB_URL="$(printf '%s\n' "$JOIN_LINE" | grep -oE -- '--hub=[^ ]+' | cut -d= -f2- || true)"
+  TOKEN="$(printf '%s\n' "$JOIN_LINE" | grep -oE -- '--token=[^ ]+' | cut -d= -f2- || true)"
+  if [ -n "$HUB_URL" ] && [ -n "$TOKEN" ]; then
+    HUB_STYLE="--hub ${HUB_URL} --token ${TOKEN}"
+  fi
+fi
+
+if [ -z "$HUB_STYLE" ]; then
+  echo "ERROR: could not parse hub endpoint/token from $JOIN_FILE. Contents:" >&2
+  cat "$JOIN_FILE" >&2
+  exit 1
+fi
+
+if ! kubectl config get-contexts "kind-${CLUSTER}" >/dev/null 2>&1; then
+  echo "ERROR: context 'kind-${CLUSTER}' not found in this machine's kubeconfig." >&2
+  echo "  You are probably on the wrong VM. This command must run ON the ${CLUSTER} VM." >&2
+  echo "  check: hostname -I   (hub=.10 spoke1=.11 spoke2=.12)" >&2
   exit 1
 fi
 
@@ -34,14 +58,12 @@ if clusteradm join --help 2>&1 | grep -q -- '--wait'; then
   WAIT="--wait"
 fi
 
-echo "joining '$CLUSTER' to hub $HUB_URL"
-clusteradm join \
+echo "joining '$CLUSTER' to hub ${HUB_URL}"
+clusteradm join $HUB_STYLE \
   --cluster-name="$CLUSTER" \
-  --hub="$HUB_URL" \
-  --token="$TOKEN" \
   --context "kind-${CLUSTER}" \
   ${WAIT:+"$WAIT"} \
   ${SILENT:+"$SILENT"}
 
 echo
-echo "join submitted. Next: on the HUB run  bash infra/setup-ocm-accept.sh"
+echo "join done. Next: on the HUB VM run  bash infra/setup-ocm-accept.sh"

@@ -12,6 +12,10 @@ repo two different ways and break things on purpose to feel the difference:
 > **Convention:** `<vmuser>` = your Debian login (run `whoami` on any VM to see it).
 > Everything marked **[WINDOWS]** runs in PowerShell on your laptop. Everything else runs
 > on the VM you're SSH'd into. Replace `YOUR_GITHUB_USERNAME` for real.
+>
+> ⚠️ **All three cloned VMs share the hostname `debian`** — always confirm where you are
+> before running anything: `hostname -I` → `.10` = hub, `.11` = spoke1, `.12` = spoke2.
+> If you work as root, paths like `~/ocm-join.txt` mean `/root/ocm-join.txt`.
 
 ---
 
@@ -162,14 +166,20 @@ scp .\ocm-join.txt <vmuser>@192.168.240.11:~
 scp .\ocm-join.txt <vmuser>@192.168.240.12:~
 ```
 
-### 3. Join both spokes — **ON spoke1 VM, then spoke2 VM**
+### 3. Join both spokes — run ON spoke1 VM, then ON spoke2 VM (never on the hub!)
 
 ```bash
-# spoke1 VM:
+# ON spoke1 VM (hostname -I must end in .11):
 bash infra/setup-ocm-spoke.sh spoke1 ~/ocm-join.txt
-# spoke2 VM:
+# ON spoke2 VM (hostname -I must end in .12):
 bash infra/setup-ocm-spoke.sh spoke2 ~/ocm-join.txt
 ```
+
+The script refuses to run if the local kubeconfig has no `kind-<cluster>` context — that's
+your guard against running it on the wrong machine. Don't hand-type `clusteradm join`
+commands; the script fills cluster name, context, and parses the (version-dependent) token
+flags for you. **Join tokens expire after ~1 hour** — if yours did, re-run
+`setup-ocm-hub.sh` on the hub to mint a fresh `ocm-join.txt` and re-relay it.
 
 This installs the **klusterlet** agent on the spoke. Notice the direction: the spoke
 *dials the hub* using the token — nothing on the hub reaches into the spoke yet.
@@ -428,6 +438,10 @@ on hub, then restart from Phase 1 step 3.
 | `curl: (7) Failed to connect to kind.sigs.k8s.io` (or any download dies mid-bootstrap) | transient/blocked mirror → re-run `sudo bash infra/bootstrap.sh`: downloads have retries and kind falls back to the GitHub release mirror; version-guarded installs skip what already succeeded |
 | `x509: certificate is valid for 192.168.240.x, not 0.0.0.0` | your `~/.kube/config` kept the `0.0.0.0` entry that kind auto-writes at cluster creation → `git pull`, then re-run `bash infra/create-cluster.sh <role>` (repairs kubeconfig merge, does NOT recreate the cluster) |
 | `x509: certificate is valid for ...` (other IP) when VM talks to another | kind cluster created before IP/certSAN matched → `kind delete cluster` + recreate (Phase 1 step 3) |
+| Hand-typed `clusteradm join ... spoke2` → `Error: cluster-name is missing` | don't hand-type joins (flag style changed across clusteradm versions) → use `bash infra/setup-ocm-spoke.sh` |
+| `ERROR: could not parse --hub/--token` from setup-ocm-spoke.sh | stale script on the VM → `git pull` (parser now handles both `--hub-token/--hub-apiserver` and legacy `--hub=/--token=` formats) |
+| `accept` hangs, or `managedcluster "spoke2" not found` | that spoke's join never completed **or ran on the wrong VM** → run `setup-ocm-spoke.sh` ON the spoke (`hostname -I` check), and on the HUB verify `kubectl -n open-cluster-management-agent get pods` is **empty** (non-empty = a join ran on the hub itself; the accept script prints cleanup steps) |
+| Join token rejected / expired | tokens live ~1 hour → re-run `setup-ocm-hub.sh` on hub, re-relay `ocm-join.txt` |
 | `clusteradm join` parse error in setup-ocm-spoke.sh | join file garbled in transfer → `cat ~/ocm-join.txt`, if it's not a single `clusteradm join ...` line, re-relay it |
 | ManagedCluster stuck `Pending` / `Joined=False` | you skipped `setup-ocm-accept.sh` → run it (hub VM) |
 | Spoke pods `ImagePullBackOff` (`open-cluster-management-agent`) | VM has no internet / proxy issue → `docker pull` one of the failing images manually to see the error |
