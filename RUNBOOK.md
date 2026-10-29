@@ -423,6 +423,8 @@ on hub, then restart from Phase 1 step 3.
 
 | Symptom | Likely cause → fix |
 |---|---|
+| Bootstrap prints `Synchronizing state of docker.service with SysV...` then goes silent | **Normal** — the docker package's systemd enable step; wait up to ~30 s. Truly frozen >2 min → `Ctrl+C` and re-run `sudo bash infra/bootstrap.sh` (idempotent, skips what's installed) |
+| `curl: (7) Failed to connect to kind.sigs.k8s.io` (or any download dies mid-bootstrap) | transient/blocked mirror → re-run `sudo bash infra/bootstrap.sh`: downloads have retries and kind falls back to the GitHub release mirror; version-guarded installs skip what already succeeded |
 | `x509: certificate is valid for ...` when VM talks to another | kind cluster created before IP/certSAN matched → `kind delete cluster` + recreate (Phase 1 step 3) |
 | `clusteradm join` parse error in setup-ocm-spoke.sh | join file garbled in transfer → `cat ~/ocm-join.txt`, if it's not a single `clusteradm join ...` line, re-relay it |
 | ManagedCluster stuck `Pending` / `Joined=False` | you skipped `setup-ocm-accept.sh` → run it (hub VM) |
