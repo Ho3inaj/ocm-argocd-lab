@@ -1,1 +1,0 @@
-# ocm-argocd-lab
