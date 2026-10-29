@@ -24,7 +24,8 @@ kubectl patch cm argocd-cm -n argocd --type merge \
 
 kubectl -n argocd rollout status deployment/argocd-server --timeout=600s
 kubectl -n argocd rollout status deployment/argocd-repo-server --timeout=600s
-kubectl -n argocd rollout status deployment/argocd-application-controller --timeout=600s
+kubectl -n argocd rollout status statefulset/argocd-application-controller --timeout=600s
+kubectl -n argocd rollout status deployment/argocd-applicationset-controller --timeout=600s
 
 KC="$SPOKE1_KUBECONFIG"
 CA="$(kubectl --kubeconfig "$KC" config view --raw --minify -o jsonpath='{.clusters[0].cluster.certificate-authority-data}')"
