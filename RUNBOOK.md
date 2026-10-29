@@ -110,8 +110,9 @@ to `https://<VM-IP>:6443`** and verifies TLS works. The kind config put your VM 
 apiserver certificate SANs and published port 6443 on the VM — without both, no other
 cluster can ever talk to this one.
 
-✅ **Checkpoint:** `kubectl get nodes -o wide` shows `Ready` on each VM, and the script
-prints a standalone kubeconfig path (`~/.kube/<role>.kubeconfig`).
+✅ **Checkpoint (both must pass — the script itself runs them):**
+1. `KUBECONFIG=~/.kube/<role>.kubeconfig kubectl get nodes -o wide` → `Ready`
+2. plain `kubectl get nodes -o wide` → `Ready` (default config, this is what everything else uses)
 
 ### 4. Relay credentials through Windows **[WINDOWS]**
 
@@ -425,7 +426,8 @@ on hub, then restart from Phase 1 step 3.
 |---|---|
 | Bootstrap prints `Synchronizing state of docker.service with SysV...` then goes silent | **Normal** — the docker package's systemd enable step; wait up to ~30 s. Truly frozen >2 min → `Ctrl+C` and re-run `sudo bash infra/bootstrap.sh` (idempotent, skips what's installed) |
 | `curl: (7) Failed to connect to kind.sigs.k8s.io` (or any download dies mid-bootstrap) | transient/blocked mirror → re-run `sudo bash infra/bootstrap.sh`: downloads have retries and kind falls back to the GitHub release mirror; version-guarded installs skip what already succeeded |
-| `x509: certificate is valid for ...` when VM talks to another | kind cluster created before IP/certSAN matched → `kind delete cluster` + recreate (Phase 1 step 3) |
+| `x509: certificate is valid for 192.168.240.x, not 0.0.0.0` | your `~/.kube/config` kept the `0.0.0.0` entry that kind auto-writes at cluster creation → `git pull`, then re-run `bash infra/create-cluster.sh <role>` (repairs kubeconfig merge, does NOT recreate the cluster) |
+| `x509: certificate is valid for ...` (other IP) when VM talks to another | kind cluster created before IP/certSAN matched → `kind delete cluster` + recreate (Phase 1 step 3) |
 | `clusteradm join` parse error in setup-ocm-spoke.sh | join file garbled in transfer → `cat ~/ocm-join.txt`, if it's not a single `clusteradm join ...` line, re-relay it |
 | ManagedCluster stuck `Pending` / `Joined=False` | you skipped `setup-ocm-accept.sh` → run it (hub VM) |
 | Spoke pods `ImagePullBackOff` (`open-cluster-management-agent`) | VM has no internet / proxy issue → `docker pull` one of the failing images manually to see the error |

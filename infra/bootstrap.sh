@@ -11,12 +11,16 @@ fi
 
 fetch() {
   local dest="$1" primary="$2" fallback="${3:-}"
-  if curl -fsSL --retry 5 --retry-delay 3 --retry-all-errors "$primary" -o "$dest"; then
+  echo "fetch: $primary"
+  if curl -fL --retry 5 --retry-delay 3 --retry-all-errors --progress-bar "$primary" -o "$dest"; then
     return 0
   fi
-  if [ -n "$fallback" ] && curl -fsSL --retry 5 --retry-delay 3 --retry-all-errors "$fallback" -o "$dest"; then
-    echo "note: primary mirror failed, used fallback: $fallback"
-    return 0
+  if [ -n "$fallback" ]; then
+    echo "fetch: $fallback"
+    if curl -fL --retry 5 --retry-delay 3 --retry-all-errors --progress-bar "$fallback" -o "$dest"; then
+      echo "note: primary mirror failed, used fallback"
+      return 0
+    fi
   fi
   echo "ERROR: download failed after retries:" >&2
   echo "  primary:   $primary" >&2
@@ -49,6 +53,7 @@ TMPD="$(mktemp -d)"
 trap 'rm -rf "$TMPD"' EXIT
 
 if ! command -v kubectl >/dev/null 2>&1 || ! kubectl version --client 2>/dev/null | grep -q "$KUBECTL_VERSION"; then
+  echo "-> kubectl ${KUBECTL_VERSION}"
   fetch "$TMPD/kubectl" \
     "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" \
     "https://cdn.dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
@@ -56,6 +61,7 @@ if ! command -v kubectl >/dev/null 2>&1 || ! kubectl version --client 2>/dev/nul
 fi
 
 if ! command -v kind >/dev/null 2>&1 || ! kind version 2>/dev/null | grep -q "$KIND_VERSION"; then
+  echo "-> kind ${KIND_VERSION} (10 MB)"
   fetch "$TMPD/kind" \
     "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-amd64" \
     "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-amd64"
@@ -63,12 +69,14 @@ if ! command -v kind >/dev/null 2>&1 || ! kind version 2>/dev/null | grep -q "$K
 fi
 
 if ! command -v argocd >/dev/null 2>&1 || ! argocd version --client 2>/dev/null | grep -q "$ARGOCD_VERSION"; then
+  echo "-> argocd CLI ${ARGOCD_VERSION}  ** 239 MB, this is the slow one - be patient **"
   fetch "$TMPD/argocd" \
     "https://github.com/argoproj/argo-cd/releases/download/${ARGOCD_VERSION}/argocd-linux-amd64"
   install -m 755 "$TMPD/argocd" /usr/local/bin/argocd
 fi
 
 if ! command -v helm >/dev/null 2>&1 || ! helm version --short 2>/dev/null | grep -q "$HELM_VERSION"; then
+  echo "-> helm ${HELM_VERSION} (15 MB)"
   fetch "$TMPD/helm.tar.gz" \
     "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz"
   tar -xzf "$TMPD/helm.tar.gz" -C "$TMPD"
@@ -76,6 +84,7 @@ if ! command -v helm >/dev/null 2>&1 || ! helm version --short 2>/dev/null | gre
 fi
 
 if ! command -v clusteradm >/dev/null 2>&1 || ! clusteradm version 2>/dev/null | grep -q "$CLUSTERADM_VERSION"; then
+  echo "-> clusteradm ${CLUSTERADM_VERSION} (46 MB)"
   fetch "$TMPD/clusteradm.tar.gz" \
     "https://github.com/open-cluster-management-io/clusteradm/releases/download/${CLUSTERADM_VERSION}/clusteradm_linux_amd64.tar.gz"
   tar -xzf "$TMPD/clusteradm.tar.gz" -C "$TMPD"

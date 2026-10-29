@@ -26,13 +26,20 @@ kind get kubeconfig --name "$ROLE" > "$RAW_KC"
 sed -E "s|server: https://.*|server: https://${IP}:6443|" "$RAW_KC" > "$HOME/.kube/${ROLE}.kubeconfig"
 rm -f "$RAW_KC"
 
-KUBECONFIG="$HOME/.kube/config:$HOME/.kube/${ROLE}.kubeconfig" kubectl config view --flatten > "$HOME/.kube/config.merged"
+# standalone file FIRST: kubectl keeps the first KUBECONFIG entry on duplicate names,
+# so our corrected server wins over the 0.0.0.0 entry kind auto-writes at create time
+KUBECONFIG="$HOME/.kube/${ROLE}.kubeconfig:$HOME/.kube/config" kubectl config view --flatten > "$HOME/.kube/config.merged"
 mv "$HOME/.kube/config.merged" "$HOME/.kube/config"
 kubectl config use-context "kind-${ROLE}" >/dev/null
+kubectl config set-cluster "kind-${ROLE}" --server="https://${IP}:6443" >/dev/null
 
 echo
-echo "== verifying apiserver at https://${IP}:6443 (TLS cert must carry this IP) =="
+echo "== [1/2] verifying standalone kubeconfig -> https://${IP}:6443 =="
 KUBECONFIG="$HOME/.kube/${ROLE}.kubeconfig" kubectl get nodes -o wide
+
+echo
+echo "== [2/2] verifying default kubeconfig (plain 'kubectl' must work) =="
+kubectl get nodes -o wide
 
 echo
 echo "standalone kubeconfig (for relay to hub): $HOME/.kube/${ROLE}.kubeconfig"
