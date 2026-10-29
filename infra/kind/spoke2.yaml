@@ -1,0 +1,16 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: spoke2
+nodes:
+- role: control-plane
+  kubeadmConfigPatches:
+  - |
+    kind: ClusterConfiguration
+    apiServer:
+      certSANs:
+      - "192.168.240.12"
+  extraPortMappings:
+  - containerPort: 6443
+    hostPort: 6443
+    listenAddress: "0.0.0.0"
+    protocol: TCP

@@ -1,0 +1,5 @@
+ocm-join.txt
+*.kubeconfig
+*.kubeconfig.*
+join*.txt
+.DS_Store

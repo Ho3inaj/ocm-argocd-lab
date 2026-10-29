@@ -1,0 +1,13 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: podinfo
+spec:
+  replicas: 2
+  template:
+    spec:
+      containers:
+        - name: podinfo
+          env:
+            - name: MESSAGE
+              value: "PULL: spoke2 pulled this itself via OCM ManifestWork"

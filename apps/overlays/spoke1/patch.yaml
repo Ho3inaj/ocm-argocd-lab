@@ -1,0 +1,13 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: podinfo
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+        - name: podinfo
+          env:
+            - name: MESSAGE
+              value: "PUSH: hub ArgoCD pushed this to spoke1"
